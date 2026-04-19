@@ -47,17 +47,3 @@ ai-model/tests/fixtures/generated/
 
 # Docker / local volumes
 *.pid
-
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.env
-venv/
-temp/
-output/
-weights/
-jobs.db
-
-node_modules/
-dist/
-.env.local
