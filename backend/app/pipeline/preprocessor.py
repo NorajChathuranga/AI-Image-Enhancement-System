@@ -4,8 +4,16 @@ import cv2
 import numpy as np
 
 
+FAST_DENOISE_PIXEL_THRESHOLD = 2_000_000
+
+
 def denoise(image: np.ndarray) -> np.ndarray:
-    """Apply color denoising using OpenCV fast non-local means."""
+    """Apply denoising with an adaptive strategy for large images."""
+    height, width = image.shape[:2]
+    if height * width > FAST_DENOISE_PIXEL_THRESHOLD:
+        # Bilateral filtering is noticeably faster than fastNlMeans on large frames.
+        return cv2.bilateralFilter(image, d=7, sigmaColor=35, sigmaSpace=35)
+
     return cv2.fastNlMeansDenoisingColored(image, None, 7, 7, 7, 21)
 
 

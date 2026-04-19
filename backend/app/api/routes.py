@@ -122,9 +122,16 @@ async def get_result(
     save_format = "PNG" if normalized_format == "png" else "JPEG"
     output_buffer = io.BytesIO()
 
-    with Image.open(output_path) as image:
-        converted = image.convert("RGB") if save_format == "JPEG" else image
-        converted.save(output_buffer, format=save_format, quality=95)
+    try:
+        with Image.open(output_path) as image:
+            if save_format == "JPEG":
+                image.convert("RGB").save(output_buffer, format="JPEG", quality=95, optimize=True)
+            else:
+                # Keep PNG export fast for large outputs to avoid client timeouts.
+                image.save(output_buffer, format="PNG", compress_level=3)
+    except Exception as exc:
+        logger.exception("Failed to convert result for job %s to %s.", job_id, normalized_format)
+        raise HTTPException(status_code=500, detail="Unable to convert result to requested format.") from exc
 
     output_buffer.seek(0)
 
