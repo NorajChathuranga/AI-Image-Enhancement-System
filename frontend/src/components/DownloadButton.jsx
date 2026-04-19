@@ -1,21 +1,31 @@
-export default function DownloadButton({ blob, filename }) {
-  const canDownload = Boolean(blob);
+import { useState } from "react";
+
+export default function DownloadButton({ canDownload, onDownload, isDownloading }) {
+  const [format, setFormat] = useState("webp");
 
   const handleDownload = () => {
-    if (!blob) {
+    if (!canDownload || isDownloading) {
       return;
     }
-    const objectUrl = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = objectUrl;
-    anchor.download = filename;
-    anchor.click();
-    URL.revokeObjectURL(objectUrl);
+    onDownload(format);
   };
 
   return (
-    <button className="action-button secondary" onClick={handleDownload} disabled={!canDownload}>
-      Download Enhanced WebP
-    </button>
+    <div className="download-controls">
+      <select
+        className="format-select"
+        value={format}
+        onChange={(event) => setFormat(event.target.value)}
+        disabled={!canDownload || isDownloading}
+        aria-label="Download format"
+      >
+        <option value="webp">WebP</option>
+        <option value="png">PNG</option>
+        <option value="jpg">JPG</option>
+      </select>
+      <button className="action-button secondary" onClick={handleDownload} disabled={!canDownload || isDownloading}>
+        {isDownloading ? "Downloading..." : "Download"}
+      </button>
+    </div>
   );
 }

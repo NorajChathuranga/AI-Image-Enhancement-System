@@ -26,6 +26,7 @@ class Settings(BaseSettings):
             "http://127.0.0.1:5173",
         ]
     )
+    allowed_origin_regex: str = r"https?://(localhost|127\.0\.0\.1)(:\d+)?$"
     allowed_mime_types: list[str] = Field(
         default_factory=lambda: [
             "image/jpeg",

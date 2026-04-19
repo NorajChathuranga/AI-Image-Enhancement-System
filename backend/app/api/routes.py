@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import io
 import logging
 from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from PIL import Image
 
 from app.core.config import get_settings
 from app.core.rate_limit import limiter
@@ -87,8 +89,11 @@ async def get_status(job_id: str) -> JobStatusResponse:
     )
 
 
-@router.get("/result/{job_id}")
-async def get_result(job_id: str) -> FileResponse:
+@router.get("/result/{job_id}", response_model=None)
+async def get_result(
+    job_id: str,
+    output_format: str = Query(default="webp", alias="format"),
+) -> FileResponse | StreamingResponse:
     """Stream enhanced image output for a completed job."""
     job = JobService().get_job(job_id)
     if job is None:
@@ -100,10 +105,35 @@ async def get_result(job_id: str) -> FileResponse:
     if not output_path.exists() or not output_path.is_file():
         raise HTTPException(status_code=404, detail="Result file not found.")
 
-    return FileResponse(
-        path=output_path,
-        media_type="image/webp",
-        filename=f"{job_id}.webp",
+    normalized_format = output_format.lower()
+    if normalized_format == "jpeg":
+        normalized_format = "jpg"
+    if normalized_format not in {"webp", "png", "jpg"}:
+        raise HTTPException(status_code=400, detail="Invalid format. Use webp, png, or jpg.")
+
+    if normalized_format == "webp":
+        return FileResponse(
+            path=output_path,
+            media_type="image/webp",
+            filename=f"{job_id}.webp",
+        )
+
+    media_type = "image/png" if normalized_format == "png" else "image/jpeg"
+    save_format = "PNG" if normalized_format == "png" else "JPEG"
+    output_buffer = io.BytesIO()
+
+    with Image.open(output_path) as image:
+        converted = image.convert("RGB") if save_format == "JPEG" else image
+        converted.save(output_buffer, format=save_format, quality=95)
+
+    output_buffer.seek(0)
+
+    return StreamingResponse(
+        content=output_buffer,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{job_id}.{normalized_format}"',
+        },
     )
 
 

@@ -31,6 +31,7 @@ export function useJobStatus(jobId, options = {}) {
 
     const pollingIntervalMs = Number(import.meta.env.VITE_POLL_INTERVAL_MS ?? 2000);
     let active = true;
+    let intervalId;
 
     const poll = async () => {
       try {
@@ -51,17 +52,22 @@ export function useJobStatus(jobId, options = {}) {
             onCompleteRef.current(payload);
           }
         }
+
+        if (payload.status === "complete" || payload.status === "failed") {
+          window.clearInterval(intervalId);
+        }
       } catch (pollError) {
         if (!active) {
           return;
         }
         setError(pollError.message);
         setStatus("failed");
+        window.clearInterval(intervalId);
       }
     };
 
     poll();
-    const intervalId = window.setInterval(poll, pollingIntervalMs);
+    intervalId = window.setInterval(poll, pollingIntervalMs);
 
     return () => {
       active = false;

@@ -10,11 +10,12 @@ import { useJobStatus } from "./hooks/useJobStatus";
 import { useUpload } from "./hooks/useUpload";
 import { fetchJobResult } from "./services/apiClient";
 
-function outputFilename(originalName) {
+function outputFilename(originalName, format = "webp") {
   const baseName = (originalName ?? "enhanced")
     .replace(/\.[A-Za-z0-9]+$/, "")
     .replace(/[^A-Za-z0-9_-]/g, "_");
-  return `${baseName || "enhanced"}_enhanced.webp`;
+  const extension = format === "jpeg" ? "jpg" : format;
+  return `${baseName || "enhanced"}_enhanced.${extension}`;
 }
 
 export default function App() {
@@ -22,6 +23,7 @@ export default function App() {
   const [jobId, setJobId] = useState("");
   const [enhancedBlob, setEnhancedBlob] = useState(null);
   const [resultError, setResultError] = useState("");
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const {
     uploadImage,
@@ -38,7 +40,7 @@ export default function App() {
         return;
       }
       try {
-        const blob = await fetchJobResult(jobId);
+        const blob = await fetchJobResult(jobId, "webp");
         setEnhancedBlob(blob);
         setResultError("");
       } catch (error) {
@@ -83,6 +85,31 @@ export default function App() {
     }
   };
 
+  const handleDownload = useCallback(
+    async (format) => {
+      if (!jobId) {
+        return;
+      }
+
+      try {
+        setIsDownloading(true);
+        const blob = await fetchJobResult(jobId, format);
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = objectUrl;
+        anchor.download = outputFilename(selectedFile?.name, format);
+        anchor.click();
+        URL.revokeObjectURL(objectUrl);
+        setResultError("");
+      } catch (error) {
+        setResultError(error.message);
+      } finally {
+        setIsDownloading(false);
+      }
+    },
+    [jobId, selectedFile]
+  );
+
   const computedError = useMemo(() => {
     if (uploadError) {
       return uploadError;
@@ -111,8 +138,9 @@ export default function App() {
               {busy ? "Processing..." : "Enhance Image"}
             </button>
             <DownloadButton
-              blob={enhancedBlob}
-              filename={outputFilename(selectedFile?.name)}
+              canDownload={Boolean(jobId && status === "complete")}
+              onDownload={handleDownload}
+              isDownloading={isDownloading}
             />
           </div>
         </header>

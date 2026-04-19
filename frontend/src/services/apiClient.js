@@ -38,10 +38,11 @@ export async function fetchJobStatus(jobId) {
   }
 }
 
-export async function fetchJobResult(jobId) {
+export async function fetchJobResult(jobId, format = "webp") {
   try {
     const response = await apiClient.get(`/v1/result/${jobId}`, {
       responseType: "blob",
+      params: { format },
     });
     return response.data;
   } catch (error) {
