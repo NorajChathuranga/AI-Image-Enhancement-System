@@ -9,7 +9,7 @@ import cv2
 from PIL import Image
 
 from app.pipeline.face_enhancer import enhance_faces
-from app.pipeline.preprocessor import preprocess
+from app.pipeline.preprocessor import deblur, denoise
 from app.pipeline.upscaler import upscale
 from app.services.model_service import ModelRuntime
 
@@ -45,10 +45,16 @@ def run_pipeline(
         raise ValueError("Unable to decode the input image.")
     stage_times["decode"] = int((time.perf_counter() - decode_start) * 1000)
 
-    mark_progress(30, "preprocess")
-    preprocess_start = time.perf_counter()
-    image = preprocess(image)
-    stage_times["preprocess"] = int((time.perf_counter() - preprocess_start) * 1000)
+    mark_progress(30, "denoise")
+    denoise_start = time.perf_counter()
+    image = denoise(image)
+    stage_times["denoise"] = int((time.perf_counter() - denoise_start) * 1000)
+
+    mark_progress(40, "deblur")
+    deblur_start = time.perf_counter()
+    image = deblur(image)
+    stage_times["deblur"] = int((time.perf_counter() - deblur_start) * 1000)
+    stage_times["preprocess"] = stage_times["denoise"] + stage_times["deblur"]
 
     mark_progress(50, "face_enhance")
     face_start = time.perf_counter()
@@ -64,7 +70,7 @@ def run_pipeline(
     encode_start = time.perf_counter()
     rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    Image.fromarray(rgb_image).save(output_path, format="WEBP", quality=90)
+    Image.fromarray(rgb_image).save(output_path, format="WEBP", quality=88, method=2)
     stage_times["encode_webp"] = int((time.perf_counter() - encode_start) * 1000)
 
     mark_progress(100, "complete")
