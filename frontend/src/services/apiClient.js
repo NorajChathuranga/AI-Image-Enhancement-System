@@ -45,9 +45,38 @@ async function parseDownloadError(error, fallback) {
   return error.response?.data?.detail ?? error.message ?? fallback;
 }
 
-export async function submitEnhancement(file, onUploadProgress) {
+function appendEnhancementOptions(formData, options = {}) {
+  if (!options || typeof options !== "object") {
+    return;
+  }
+
+  formData.append("preset", String(options.preset ?? "balanced"));
+
+  if (Number.isFinite(options.scaleFactor)) {
+    formData.append("scale_factor", String(options.scaleFactor));
+  }
+
+  if (typeof options.denoise === "boolean") {
+    formData.append("denoise", String(options.denoise));
+  }
+
+  if (typeof options.deblur === "boolean") {
+    formData.append("deblur", String(options.deblur));
+  }
+
+  if (typeof options.faceEnhance === "boolean") {
+    formData.append("face_enhance", String(options.faceEnhance));
+  }
+
+  if (Number.isFinite(options.outputQuality)) {
+    formData.append("output_quality", String(options.outputQuality));
+  }
+}
+
+export async function submitEnhancement(file, options = {}, onUploadProgress) {
   const formData = new FormData();
   formData.append("file", file);
+  appendEnhancementOptions(formData, options);
 
   try {
     const response = await apiClient.post("/v1/enhance", formData, {

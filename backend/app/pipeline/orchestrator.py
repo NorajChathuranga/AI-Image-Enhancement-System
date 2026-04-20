@@ -28,6 +28,10 @@ def run_pipeline(
     output_path: Path,
     runtime: ModelRuntime,
     scale_factor: int,
+    denoise_enabled: bool = True,
+    deblur_enabled: bool = True,
+    face_enhance_enabled: bool = True,
+    output_quality: int = 88,
     progress_callback: Callable[[int, str], None] | None = None,
 ) -> PipelineResult:
     """Run image pipeline and persist final WebP output."""
@@ -45,20 +49,23 @@ def run_pipeline(
         raise ValueError("Unable to decode the input image.")
     stage_times["decode"] = int((time.perf_counter() - decode_start) * 1000)
 
-    mark_progress(30, "denoise")
+    mark_progress(30, "denoise" if denoise_enabled else "denoise_skipped")
     denoise_start = time.perf_counter()
-    image = denoise(image)
+    if denoise_enabled:
+        image = denoise(image)
     stage_times["denoise"] = int((time.perf_counter() - denoise_start) * 1000)
 
-    mark_progress(40, "deblur")
+    mark_progress(40, "deblur" if deblur_enabled else "deblur_skipped")
     deblur_start = time.perf_counter()
-    image = deblur(image)
+    if deblur_enabled:
+        image = deblur(image)
     stage_times["deblur"] = int((time.perf_counter() - deblur_start) * 1000)
     stage_times["preprocess"] = stage_times["denoise"] + stage_times["deblur"]
 
-    mark_progress(50, "face_enhance")
+    mark_progress(50, "face_enhance" if face_enhance_enabled else "face_enhance_skipped")
     face_start = time.perf_counter()
-    image = enhance_faces(image, runtime.gfpgan_model)
+    if face_enhance_enabled:
+        image = enhance_faces(image, runtime.gfpgan_model)
     stage_times["face_enhance"] = int((time.perf_counter() - face_start) * 1000)
 
     mark_progress(75, "super_resolution")
@@ -70,7 +77,13 @@ def run_pipeline(
     encode_start = time.perf_counter()
     rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    Image.fromarray(rgb_image).save(output_path, format="WEBP", quality=88, method=2)
+    normalized_quality = max(1, min(100, output_quality))
+    Image.fromarray(rgb_image).save(
+        output_path,
+        format="WEBP",
+        quality=normalized_quality,
+        method=2,
+    )
     stage_times["encode_webp"] = int((time.perf_counter() - encode_start) * 1000)
 
     mark_progress(100, "complete")
