@@ -201,7 +201,16 @@ export default function App() {
           </p>
           <div className="hero-actions">
             <button className="action-button" onClick={handleEnhance} disabled={!selectedFile || busy}>
-              {busy ? "Processing..." : "Enhance Image"}
+              {busy ? (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <svg className="spinner" viewBox="0 0 24 24" fill="none" style={{ width: '1.2rem', height: '1.2rem', animation: 'spin 1s linear infinite' }}>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="30 30" strokeLinecap="round" opacity="0.8"></circle>
+                  </svg>
+                  Processing...
+                </span>
+              ) : (
+                "Enhance Image"
+              )}
             </button>
             <DownloadButton
               canDownload={Boolean(jobId && status === "complete")}
@@ -212,14 +221,16 @@ export default function App() {
         </header>
 
         <section className="grid">
-          <ImageUploader selectedFile={selectedFile} onFileSelected={handleSelectFile} disabled={busy} />
+          <div className="layout-column">
+            <ImageUploader selectedFile={selectedFile} onFileSelected={handleSelectFile} disabled={busy} />
+            <ProgressBar uploadProgress={uploadProgress} processingProgress={progressPct} status={status} />
+          </div>
           <EnhancementControls
             options={enhancementOptions}
             onPresetChange={handlePresetChange}
             onOptionChange={handleOptionChange}
             disabled={busy}
           />
-          <ProgressBar uploadProgress={uploadProgress} processingProgress={progressPct} status={status} />
         </section>
 
         <JobStatus
