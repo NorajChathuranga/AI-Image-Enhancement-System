@@ -17,13 +17,22 @@ export default function CompareSlider({ beforeUrl, afterUrl }) {
       <h2>Before and After</h2>
       <div className="compare-wrapper">
         <img src={beforeUrl} alt="Before enhancement" className="compare-image" />
+        <span className="compare-badge before-badge">Before</span>
 
         <div className="compare-after" style={{ width: `${position}%` }}>
           <img src={afterUrl} alt="After enhancement" className="compare-image" />
+          <span className="compare-badge after-badge">After</span>
         </div>
 
         <div className="compare-divider" style={{ left: `${position}%` }}>
-          <span className="compare-handle" />
+          <div className="compare-handle">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </div>
         </div>
 
         <input
