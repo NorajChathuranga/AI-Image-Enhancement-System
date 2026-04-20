@@ -31,16 +31,13 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Environment files
-.env
-.env.*
-!.env.example
 
 # Backend runtime artifacts
 backend/jobs.db
 backend/temp/
 backend/output/
 backend/weights/
+backend/gfpgan/weights/*.pth
 
 # AI model artifacts
 ai-model/tests/fixtures/generated/
