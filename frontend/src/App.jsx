@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import CompareSlider from "./components/CompareSlider";
 import DownloadButton from "./components/DownloadButton";
+import EnhancementControls from "./components/EnhancementControls";
 import ImageUploader from "./components/ImageUploader";
 import JobStatus from "./components/JobStatus";
 import ProgressBar from "./components/ProgressBar";
@@ -9,6 +10,46 @@ import { useImageCompare } from "./hooks/useImageCompare";
 import { useJobStatus } from "./hooks/useJobStatus";
 import { useUpload } from "./hooks/useUpload";
 import { fetchJobResult } from "./services/apiClient";
+
+const PRESET_OPTIONS = {
+  fast: {
+    scaleFactor: 2,
+    denoise: false,
+    deblur: false,
+    faceEnhance: false,
+    outputQuality: 82,
+  },
+  balanced: {
+    scaleFactor: 4,
+    denoise: true,
+    deblur: true,
+    faceEnhance: true,
+    outputQuality: 88,
+  },
+  quality: {
+    scaleFactor: 4,
+    denoise: true,
+    deblur: true,
+    faceEnhance: true,
+    outputQuality: 94,
+  },
+};
+
+const DEFAULT_PRESET = "balanced";
+
+function createOptionsFromPreset(preset) {
+  const basePreset = PRESET_OPTIONS[preset] ? preset : DEFAULT_PRESET;
+  const baseline = PRESET_OPTIONS[basePreset];
+
+  return {
+    preset: basePreset,
+    scaleFactor: baseline.scaleFactor,
+    denoise: baseline.denoise,
+    deblur: baseline.deblur,
+    faceEnhance: baseline.faceEnhance,
+    outputQuality: baseline.outputQuality,
+  };
+}
 
 function outputFilename(originalName, format = "webp") {
   const baseName = (originalName ?? "enhanced")
@@ -24,6 +65,9 @@ export default function App() {
   const [enhancedBlob, setEnhancedBlob] = useState(null);
   const [resultError, setResultError] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
+  const [enhancementOptions, setEnhancementOptions] = useState(() =>
+    createOptionsFromPreset(DEFAULT_PRESET)
+  );
 
   const {
     uploadImage,
@@ -59,26 +103,48 @@ export default function App() {
 
   const busy = isUploading || status === "pending" || status === "processing";
 
-  const handleSelectFile = (file) => {
-    setSelectedFile(file);
+  const resetResultState = useCallback(() => {
     setJobId("");
     setEnhancedBlob(null);
     setResultError("");
+  }, []);
+
+  const handleSelectFile = (file) => {
+    setSelectedFile(file);
+    resetResultState();
     setUploadError("");
     resetUploadState();
   };
+
+  const handlePresetChange = useCallback(
+    (preset) => {
+      setEnhancementOptions(createOptionsFromPreset(preset));
+      resetResultState();
+    },
+    [resetResultState]
+  );
+
+  const handleOptionChange = useCallback(
+    (field, value) => {
+      setEnhancementOptions((previous) => ({
+        ...previous,
+        preset: "custom",
+        [field]: value,
+      }));
+      resetResultState();
+    },
+    [resetResultState]
+  );
 
   const handleEnhance = async () => {
     if (!selectedFile || busy) {
       return;
     }
 
-    setEnhancedBlob(null);
-    setResultError("");
-    setJobId("");
+    resetResultState();
 
     try {
-      const payload = await uploadImage(selectedFile);
+      const payload = await uploadImage(selectedFile, enhancementOptions);
       setJobId(payload.job_id);
     } catch (error) {
       setResultError(error.message);
@@ -135,7 +201,16 @@ export default function App() {
           </p>
           <div className="hero-actions">
             <button className="action-button" onClick={handleEnhance} disabled={!selectedFile || busy}>
-              {busy ? "Processing..." : "Enhance Image"}
+              {busy ? (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <svg className="spinner" viewBox="0 0 24 24" fill="none" style={{ width: '1.2rem', height: '1.2rem', animation: 'spin 1s linear infinite' }}>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="30 30" strokeLinecap="round" opacity="0.8"></circle>
+                  </svg>
+                  Processing...
+                </span>
+              ) : (
+                "Enhance Image"
+              )}
             </button>
             <DownloadButton
               canDownload={Boolean(jobId && status === "complete")}
@@ -146,8 +221,16 @@ export default function App() {
         </header>
 
         <section className="grid">
-          <ImageUploader selectedFile={selectedFile} onFileSelected={handleSelectFile} disabled={busy} />
-          <ProgressBar uploadProgress={uploadProgress} processingProgress={progressPct} status={status} />
+          <div className="layout-column">
+            <ImageUploader selectedFile={selectedFile} onFileSelected={handleSelectFile} disabled={busy} />
+            <ProgressBar uploadProgress={uploadProgress} processingProgress={progressPct} status={status} />
+          </div>
+          <EnhancementControls
+            options={enhancementOptions}
+            onPresetChange={handlePresetChange}
+            onOptionChange={handleOptionChange}
+            disabled={busy}
+          />
         </section>
 
         <JobStatus

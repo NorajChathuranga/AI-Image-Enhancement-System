@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import io
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from PIL import Image
 
@@ -22,6 +23,107 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 router = APIRouter(prefix=settings.api_v1_prefix, tags=["jobs"])
 
+PRESET_PROFILES: dict[str, dict[str, int | bool]] = {
+    "fast": {
+        "scale_factor": 2,
+        "denoise": False,
+        "deblur": False,
+        "face_enhance": False,
+        "output_quality": 82,
+    },
+    "balanced": {
+        "scale_factor": 4,
+        "denoise": True,
+        "deblur": True,
+        "face_enhance": True,
+        "output_quality": 88,
+    },
+    "custom": {
+        "scale_factor": 4,
+        "denoise": True,
+        "deblur": True,
+        "face_enhance": True,
+        "output_quality": 88,
+    },
+    "quality": {
+        "scale_factor": 4,
+        "denoise": True,
+        "deblur": True,
+        "face_enhance": True,
+        "output_quality": 94,
+    },
+}
+ALLOWED_SCALE_FACTORS = {2, 4}
+MIN_OUTPUT_QUALITY = 70
+MAX_OUTPUT_QUALITY = 100
+
+
+@dataclass(frozen=True)
+class EnhancementOptions:
+    """Validated runtime options for a single enhancement job."""
+
+    preset: str
+    scale_factor: int
+    denoise: bool
+    deblur: bool
+    face_enhance: bool
+    output_quality: int
+
+    def as_dict(self) -> dict[str, str | int | bool]:
+        """Serialize options for worker handoff."""
+        return {
+            "preset": self.preset,
+            "scale_factor": self.scale_factor,
+            "denoise": self.denoise,
+            "deblur": self.deblur,
+            "face_enhance": self.face_enhance,
+            "output_quality": self.output_quality,
+        }
+
+
+def resolve_enhancement_options(
+    preset: str,
+    scale_factor: int | None,
+    denoise: bool | None,
+    deblur: bool | None,
+    face_enhance: bool | None,
+    output_quality: int | None,
+) -> EnhancementOptions:
+    """Resolve preset defaults and apply user overrides."""
+    normalized_preset = (preset or "balanced").strip().lower()
+    if normalized_preset not in PRESET_PROFILES:
+        allowed = ", ".join(sorted(PRESET_PROFILES))
+        raise HTTPException(status_code=400, detail=f"Invalid preset. Use one of: {allowed}.")
+
+    defaults = PRESET_PROFILES[normalized_preset]
+    resolved_scale = scale_factor if scale_factor is not None else int(defaults["scale_factor"])
+    resolved_quality = (
+        output_quality if output_quality is not None else int(defaults["output_quality"])
+    )
+
+    if resolved_scale not in ALLOWED_SCALE_FACTORS:
+        raise HTTPException(status_code=400, detail="Invalid scale_factor. Use 2 or 4.")
+
+    if resolved_quality < MIN_OUTPUT_QUALITY or resolved_quality > MAX_OUTPUT_QUALITY:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Invalid output_quality. "
+                f"Use a value between {MIN_OUTPUT_QUALITY} and {MAX_OUTPUT_QUALITY}."
+            ),
+        )
+
+    return EnhancementOptions(
+        preset=normalized_preset,
+        scale_factor=resolved_scale,
+        denoise=denoise if denoise is not None else bool(defaults["denoise"]),
+        deblur=deblur if deblur is not None else bool(defaults["deblur"]),
+        face_enhance=(
+            face_enhance if face_enhance is not None else bool(defaults["face_enhance"])
+        ),
+        output_quality=resolved_quality,
+    )
+
 
 @router.post("/enhance", response_model=EnhanceResponse, status_code=202)
 @limiter.limit(settings.rate_limit)
@@ -29,6 +131,12 @@ async def submit_enhancement(
     request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    preset: str = Form(default="balanced"),
+    scale_factor: int | None = Form(default=None),
+    denoise: bool | None = Form(default=None),
+    deblur: bool | None = Form(default=None),
+    face_enhance: bool | None = Form(default=None),
+    output_quality: int | None = Form(default=None),
 ) -> EnhanceResponse:
     """Accept an image upload and schedule async enhancement."""
     jobs = JobService()
@@ -46,6 +154,15 @@ async def submit_enhancement(
     except UploadValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    options = resolve_enhancement_options(
+        preset=preset,
+        scale_factor=scale_factor,
+        denoise=denoise,
+        deblur=deblur,
+        face_enhance=face_enhance,
+        output_quality=output_quality,
+    )
+
     try:
         job_id = str(uuid4())
         input_path = save_upload_bytes(settings, job_id, payload, detected_mime)
@@ -62,6 +179,7 @@ async def submit_enhancement(
             str(input_path),
             settings,
             request.app.state.model_service,
+            options.as_dict(),
         )
 
         return EnhanceResponse(job_id=job_id, status="pending")

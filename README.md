@@ -77,7 +77,7 @@ Input Image
 ④ Face Detection  ← GFPGAN internal face detector
     │
     ▼
-⑤ Face Enhance    ← GFPGAN v1.4 restoration
+⑤ Face Enhance    ← GFPGAN v1.3 restoration
     │
     ▼
 ⑥ Super-Res       ← Real-ESRGAN 4× (tile=512 to prevent OOM)
@@ -187,7 +187,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-> **First startup note:** On the very first run, the backend downloads Real-ESRGAN and GFPGAN weights (~500MB total). This takes 5–10 minutes depending on your connection. Subsequent starts load from cache instantly.
+> **First startup note:** On first run, GFPGAN helper files (`detection_Resnet50_Final.pth`, `parsing_parsenet.pth`) can auto-download if internet is available. Main checkpoints (`realesr-general-x4v3.pth`, `GFPGANv1.3.pth`) must already exist in `backend/weights/`.
 
 ---
 

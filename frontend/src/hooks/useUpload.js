@@ -12,13 +12,13 @@ export function useUpload() {
     setUploadError("");
   }, []);
 
-  const uploadImage = useCallback(async (file) => {
+  const uploadImage = useCallback(async (file, options = null) => {
     setUploadError("");
     setUploadProgress(0);
     setIsUploading(true);
 
     try {
-      const payload = await submitEnhancement(file, (event) => {
+      const payload = await submitEnhancement(file, options, (event) => {
         if (!event.total) {
           return;
         }

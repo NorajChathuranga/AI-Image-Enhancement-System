@@ -48,7 +48,11 @@ class Settings(BaseSettings):
     weights_dir: Path = Path("backend/weights")
 
     model_checkpoint_realesrgan: str = "realesr-general-x4v3.pth"
-    model_checkpoint_gfpgan: str = "GFPGANv1.4.pth"
+    model_checkpoint_gfpgan: str = "GFPGANv1.3.pth"
+    model_auto_download: bool = True
+    model_download_timeout_seconds: int = 600
+    model_checkpoint_realesrgan_url: str | None = None
+    model_checkpoint_gfpgan_url: str | None = None
 
     scale_factor: int = 4
     tile_size: int = 512
